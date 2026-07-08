@@ -27,6 +27,13 @@ jobs:
         run: node scripts/generate.mjs
         env:
           LIMIT_PER_COUNTRY: "5"
+          ENABLE_CONNECT_CHECK: "true"
+          CHECK_HOST: "speed.cloudflare.com"
+          CHECK_PATH: "/cdn-cgi/trace"
+          CHECK_TIMEOUT_MS: "3000"
+          CHECK_CONCURRENCY: "10"
+          MAX_FAILURES_PER_COUNTRY: "10"
+          STRICT_COUNTRY_SELECTED_COUNTS: "false"
 
       - name: Commit updated exports
         working-directory: repo

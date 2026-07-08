@@ -38,6 +38,25 @@ You can also run it manually from the Actions tab.
 
 Bad upstream updates are rejected. If the upstream list is empty, unavailable, loses countries, or drops significantly, the workflow keeps the last committed export.
 
+## Connectivity Check
+
+The daily workflow verifies candidates with a lightweight HTTPS/SNI check before adding them to `exports/latest`.
+
+Default check settings:
+
+```txt
+ENABLE_CONNECT_CHECK=true
+CHECK_HOST=speed.cloudflare.com
+CHECK_PATH=/cdn-cgi/trace
+CHECK_TIMEOUT_MS=3000
+CHECK_CONCURRENCY=10
+MAX_FAILURES_PER_COUNTRY=10
+```
+
+Per country, the generator stops when it has selected 5 working entries, has seen 10 failed checks, or runs out of candidates.
+
+`CHECK_HOST` is not written into generated JSON or logs, so it can be changed to a GitHub Actions secret later without leaking through the exported files.
+
 ## Local Usage
 
 ```bash
@@ -54,4 +73,10 @@ Change the source URL:
 
 ```bash
 SOURCE_URL=https://zip.cm.edu.kg/all.json npm run generate
+```
+
+Run with the HTTPS/SNI check locally:
+
+```bash
+ENABLE_CONNECT_CHECK=true npm run generate
 ```

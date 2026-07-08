@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import tls from "node:tls";
 
 const SOURCE_URL = process.env.SOURCE_URL || "https://zip.cm.edu.kg/all.json";
 const TXT_SOURCE_URL = process.env.TXT_SOURCE_URL || SOURCE_URL.replace(/\/all\.json$/, "/all.txt");
@@ -10,6 +11,18 @@ const MIN_SELECTED_RATIO = Number.parseFloat(process.env.MIN_SELECTED_RATIO || "
 const MIN_SOURCE_TOTAL_RATIO = Number.parseFloat(process.env.MIN_SOURCE_TOTAL_RATIO || "0.50");
 const STRICT_COUNTRY_SET = process.env.STRICT_COUNTRY_SET !== "false";
 const STRICT_COUNTRY_SELECTED_COUNTS = process.env.STRICT_COUNTRY_SELECTED_COUNTS !== "false";
+const ENABLE_CONNECT_CHECK = process.env.ENABLE_CONNECT_CHECK === "true";
+const CHECK_HOST = process.env.CHECK_HOST || "speed.cloudflare.com";
+const CHECK_PATH = process.env.CHECK_PATH || "/cdn-cgi/trace";
+const CHECK_TIMEOUT_MS = Number.parseInt(process.env.CHECK_TIMEOUT_MS || "3000", 10);
+const CHECK_CONCURRENCY = Number.parseInt(process.env.CHECK_CONCURRENCY || "10", 10);
+const MAX_FAILURES_PER_COUNTRY = Number.parseInt(process.env.MAX_FAILURES_PER_COUNTRY || "10", 10);
+const CHECK_ACCEPT_STATUSES = new Set(
+  (process.env.CHECK_ACCEPT_STATUSES || "200,204,301,302,403,404")
+    .split(",")
+    .map((status) => Number.parseInt(status.trim(), 10))
+    .filter(Number.isInteger)
+);
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
   "cloudflare-ip-filter/1.0"
@@ -289,6 +302,36 @@ function countryLabel(code, meta = {}) {
   return `${code} - ${name}${emoji ? ` ${emoji}` : ""}`;
 }
 
+function normalizeCheckPath(value) {
+  return value.startsWith("/") ? value : `/${value}`;
+}
+
+function createLimiter(limit) {
+  let active = 0;
+  const queue = [];
+
+  function drain() {
+    if (active >= limit || queue.length === 0) return;
+
+    active += 1;
+    const { task, resolve, reject } = queue.shift();
+    Promise.resolve()
+      .then(task)
+      .then(resolve, reject)
+      .finally(() => {
+        active -= 1;
+        drain();
+      });
+  }
+
+  return function limitTask(task) {
+    return new Promise((resolve, reject) => {
+      queue.push({ task, resolve, reject });
+      drain();
+    });
+  };
+}
+
 function normalizeEntry(item) {
   const meta = item.meta || {};
   const country = String(meta.country || "").trim().toUpperCase();
@@ -309,6 +352,80 @@ function normalizeEntry(item) {
       asn: meta.asn || null,
       organization: meta.asOrganization || ""
     }));
+}
+
+function checkHttpsSni(entry) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let buffer = "";
+
+    function finish(socket, ok) {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(ok);
+    }
+
+    const socket = tls.connect({
+      host: entry.ip,
+      port: entry.port,
+      servername: CHECK_HOST,
+      rejectUnauthorized: true,
+      ALPNProtocols: ["http/1.1"],
+      timeout: CHECK_TIMEOUT_MS
+    });
+
+    socket.setTimeout(CHECK_TIMEOUT_MS);
+
+    socket.once("secureConnect", () => {
+      socket.write([
+        `GET ${normalizeCheckPath(CHECK_PATH)} HTTP/1.1`,
+        `Host: ${CHECK_HOST}`,
+        "User-Agent: cloudflare-ip-filter/1.0",
+        "Accept: */*",
+        "Connection: close",
+        "",
+        ""
+      ].join("\r\n"));
+    });
+
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const headerEnd = buffer.indexOf("\r\n");
+      if (headerEnd === -1) return;
+
+      const statusLine = buffer.slice(0, headerEnd);
+      const match = statusLine.match(/^HTTP\/\d(?:\.\d)?\s+(\d{3})\b/);
+      finish(socket, Boolean(match && CHECK_ACCEPT_STATUSES.has(Number.parseInt(match[1], 10))));
+    });
+
+    socket.once("timeout", () => finish(socket, false));
+    socket.once("error", () => finish(socket, false));
+    socket.once("end", () => finish(socket, false));
+    socket.once("close", () => finish(socket, false));
+  });
+}
+
+async function selectCountryEntries(country, entries, limitTask) {
+  if (!ENABLE_CONNECT_CHECK) {
+    return entries.slice(0, LIMIT_PER_COUNTRY);
+  }
+
+  const picked = [];
+  let failures = 0;
+
+  for (const entry of entries) {
+    if (picked.length >= LIMIT_PER_COUNTRY || failures >= MAX_FAILURES_PER_COUNTRY) break;
+
+    const ok = await limitTask(() => checkHttpsSni(entry));
+    if (ok) {
+      picked.push(entry);
+    } else {
+      failures += 1;
+    }
+  }
+
+  return picked;
 }
 
 async function fetchBody(url, accept) {
@@ -409,7 +526,7 @@ async function readBaselineSnapshot() {
   }
 }
 
-function buildSnapshot(source, status = "fresh") {
+async function buildSnapshot(source, status = "fresh") {
   const seed = daySeed(source.generated_at);
   const seen = new Set();
   const groups = new Map();
@@ -427,20 +544,26 @@ function buildSnapshot(source, status = "fresh") {
 
   const countries = [];
   const selected = [];
+  const limitTask = createLimiter(CHECK_CONCURRENCY);
 
-  for (const [country, entries] of groups) {
+  const sortedGroups = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const countryResults = await Promise.all(sortedGroups.map(async ([country, entries]) => {
     entries.sort((a, b) => {
       const ah = hashString(`${seed}:${a.country}:${a.ip}:${a.port}`);
       const bh = hashString(`${seed}:${b.country}:${b.ip}:${b.port}`);
       return ah - bh;
     });
 
-    const picked = entries.slice(0, LIMIT_PER_COUNTRY);
+    const picked = await selectCountryEntries(country, entries, limitTask);
+    return { country, entries, picked };
+  }));
+
+  for (const { country, entries, picked } of countryResults) {
     selected.push(...picked);
     countries.push({
       code: country,
-      name: picked[0]?.country_name || COUNTRY_FALLBACK[country]?.[0] || country,
-      emoji: picked[0]?.country_emoji || COUNTRY_FALLBACK[country]?.[1] || "",
+      name: picked[0]?.country_name || entries[0]?.country_name || COUNTRY_FALLBACK[country]?.[0] || country,
+      emoji: picked[0]?.country_emoji || entries[0]?.country_emoji || COUNTRY_FALLBACK[country]?.[1] || "",
       source_count: entries.length,
       selected_count: picked.length
     });
@@ -458,6 +581,13 @@ function buildSnapshot(source, status = "fresh") {
     limit_per_country: LIMIT_PER_COUNTRY,
     source_total: source.list?.ips || null,
     selected_total: selected.length,
+    check: {
+      enabled: ENABLE_CONNECT_CHECK,
+      mode: ENABLE_CONNECT_CHECK ? "https_sni" : "none",
+      timeout_ms: CHECK_TIMEOUT_MS,
+      concurrency: CHECK_CONCURRENCY,
+      max_failures_per_country: MAX_FAILURES_PER_COUNTRY
+    },
     countries,
     data: selected
   };
@@ -544,6 +674,7 @@ function stableSnapshotPayload(snapshot) {
 function hasMeaningfulChange(candidate, previous) {
   if (!previous) return true;
   if (previous.status && previous.status !== "fresh") return true;
+  if (!previous.check) return true;
   return stableSnapshotPayload(candidate) !== stableSnapshotPayload(previous);
 }
 
@@ -580,6 +711,18 @@ async function main() {
   if (!Number.isInteger(LIMIT_PER_COUNTRY) || LIMIT_PER_COUNTRY < 1) {
     throw new Error("LIMIT_PER_COUNTRY must be a positive integer");
   }
+  if (!Number.isInteger(CHECK_TIMEOUT_MS) || CHECK_TIMEOUT_MS < 250) {
+    throw new Error("CHECK_TIMEOUT_MS must be an integer >= 250");
+  }
+  if (!Number.isInteger(CHECK_CONCURRENCY) || CHECK_CONCURRENCY < 1) {
+    throw new Error("CHECK_CONCURRENCY must be a positive integer");
+  }
+  if (!Number.isInteger(MAX_FAILURES_PER_COUNTRY) || MAX_FAILURES_PER_COUNTRY < 0) {
+    throw new Error("MAX_FAILURES_PER_COUNTRY must be a non-negative integer");
+  }
+  if (CHECK_ACCEPT_STATUSES.size === 0) {
+    throw new Error("CHECK_ACCEPT_STATUSES must contain at least one HTTP status");
+  }
 
   const previous = await readBaselineSnapshot();
   let source;
@@ -595,7 +738,7 @@ async function main() {
     return;
   }
 
-  snapshot = buildSnapshot(source);
+  snapshot = await buildSnapshot(source);
   const validation = validateCandidate(snapshot, previous);
 
   if (!validation.ok && previous) {
