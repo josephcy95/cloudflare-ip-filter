@@ -1,11 +1,15 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const SOURCE_URL = process.env.SOURCE_URL || "https://zip.cm.edu.kg/all.json";
 const TXT_SOURCE_URL = process.env.TXT_SOURCE_URL || SOURCE_URL.replace(/\/all\.json$/, "/all.txt");
-const PUBLISHED_FALLBACK_URL = process.env.PUBLISHED_FALLBACK_URL || "https://josephcy95.github.io/cloudflare-ip-filter/all.json";
-const OUT_DIR = process.env.OUT_DIR || "public";
+const OUT_DIR = process.env.OUT_DIR || "exports/latest";
+const BASELINE_PATH = process.env.BASELINE_PATH || path.join(OUT_DIR, "all.json");
 const LIMIT_PER_COUNTRY = Number.parseInt(process.env.LIMIT_PER_COUNTRY || "5", 10);
+const MIN_SELECTED_RATIO = Number.parseFloat(process.env.MIN_SELECTED_RATIO || "0.95");
+const MIN_SOURCE_TOTAL_RATIO = Number.parseFloat(process.env.MIN_SOURCE_TOTAL_RATIO || "0.50");
+const STRICT_COUNTRY_SET = process.env.STRICT_COUNTRY_SET !== "false";
+const STRICT_COUNTRY_SELECTED_COUNTS = process.env.STRICT_COUNTRY_SELECTED_COUNTS !== "false";
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
   "cloudflare-ip-filter/1.0"
@@ -375,32 +379,6 @@ async function fetchTxtSource() {
   return sourceFromTxt(body);
 }
 
-function sourceFromPublished(json) {
-  const data = (json.data || []).map((entry) => ({
-    ip: entry.ip,
-    port: [Number(entry.port)],
-    meta: {
-      country: entry.country,
-      country_en: entry.country_name,
-      country_emoji: entry.country_emoji,
-      city: entry.city,
-      region: entry.region,
-      asn: entry.asn,
-      asOrganization: entry.organization
-    }
-  }));
-
-  if (data.length === 0) {
-    throw new Error("Published fallback contained no valid entries");
-  }
-
-  return {
-    generated_at: json.source_generated_at || json.generated_at || new Date().toISOString(),
-    list: { ips: json.source_total || data.length },
-    data
-  };
-}
-
 async function fetchSource() {
   const errors = [];
 
@@ -416,22 +394,22 @@ async function fetchSource() {
     errors.push(`txt: ${error.message}`);
   }
 
-  try {
-    const body = await fetchBody(PUBLISHED_FALLBACK_URL, "application/json,text/plain,*/*");
-    return sourceFromPublished(JSON.parse(body));
-  } catch (error) {
-    errors.push(`published fallback: ${error.message}`);
-  }
-
   throw new Error(`Unable to fetch any source. ${errors.join(" | ")}`);
 }
 
-async function main() {
-  if (!Number.isInteger(LIMIT_PER_COUNTRY) || LIMIT_PER_COUNTRY < 1) {
-    throw new Error("LIMIT_PER_COUNTRY must be a positive integer");
+async function readBaselineSnapshot() {
+  try {
+    const body = await readFile(BASELINE_PATH, "utf8");
+    const snapshot = JSON.parse(body);
+    if (!Array.isArray(snapshot.data) || snapshot.data.length === 0) return null;
+    if (!Array.isArray(snapshot.countries) || snapshot.countries.length === 0) return null;
+    return snapshot;
+  } catch {
+    return null;
   }
+}
 
-  const source = await fetchSource();
+function buildSnapshot(source, status = "fresh") {
   const seed = daySeed(source.generated_at);
   const seen = new Set();
   const groups = new Map();
@@ -471,91 +449,166 @@ async function main() {
   selected.sort((a, b) => a.country.localeCompare(b.country) || a.ip.localeCompare(b.ip) || a.port - b.port);
   countries.sort((a, b) => a.code.localeCompare(b.code));
 
-  const lines = selected.map((entry) => `${entry.ip}:${entry.port}# ${entry.label}`);
+  return {
+    generated_at: new Date().toISOString(),
+    source_url: SOURCE_URL,
+    source_generated_at: source.generated_at || null,
+    seed,
+    status,
+    limit_per_country: LIMIT_PER_COUNTRY,
+    source_total: source.list?.ips || null,
+    selected_total: selected.length,
+    countries,
+    data: selected
+  };
+}
+
+function countryCountMap(snapshot) {
+  return new Map((snapshot.countries || []).map((country) => [country.code, country.selected_count]));
+}
+
+function validateCandidate(candidate, previous) {
+  if (!previous) {
+    return { ok: true, reasons: [] };
+  }
+
+  const reasons = [];
+  const candidateCountries = countryCountMap(candidate);
+  const previousCountries = countryCountMap(previous);
+
+  if (!candidate.selected_total || candidate.selected_total < 1) {
+    reasons.push("candidate selected list is empty");
+  }
+
+  if (previous.selected_total && candidate.selected_total < Math.ceil(previous.selected_total * MIN_SELECTED_RATIO)) {
+    reasons.push(`selected total dropped from ${previous.selected_total} to ${candidate.selected_total}`);
+  }
+
+  if (
+    previous.source_total &&
+    candidate.source_total &&
+    candidate.source_total < Math.ceil(previous.source_total * MIN_SOURCE_TOTAL_RATIO)
+  ) {
+    reasons.push(`source total dropped from ${previous.source_total} to ${candidate.source_total}`);
+  }
+
+  if (STRICT_COUNTRY_SET) {
+    const missingCountries = [...previousCountries.keys()].filter((code) => !candidateCountries.has(code));
+    if (missingCountries.length > 0) {
+      reasons.push(`countries disappeared: ${missingCountries.join(", ")}`);
+    }
+  }
+
+  if (STRICT_COUNTRY_SELECTED_COUNTS) {
+    const reducedCountries = [...previousCountries.entries()]
+      .filter(([code, count]) => candidateCountries.has(code) && candidateCountries.get(code) < count)
+      .map(([code, count]) => `${code} ${count}->${candidateCountries.get(code)}`);
+
+    if (reducedCountries.length > 0) {
+      reasons.push(`country selected counts dropped: ${reducedCountries.join(", ")}`);
+    }
+  }
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+function reusePreviousSnapshot(previous, reasons) {
+  return {
+    ...previous,
+    generated_at: new Date().toISOString(),
+    status: "reused_previous",
+    rejected_update: {
+      checked_at: new Date().toISOString(),
+      reasons
+    }
+  };
+}
+
+function stableSnapshotPayload(snapshot) {
+  return JSON.stringify({
+    limit_per_country: snapshot.limit_per_country,
+    source_total: snapshot.source_total,
+    selected_total: snapshot.selected_total,
+    countries: snapshot.countries,
+    data: (snapshot.data || []).map((entry) => ({
+      ip: entry.ip,
+      port: entry.port,
+      country: entry.country,
+      label: entry.label,
+      country_name: entry.country_name,
+      country_emoji: entry.country_emoji
+    }))
+  });
+}
+
+function hasMeaningfulChange(candidate, previous) {
+  if (!previous) return true;
+  if (previous.status && previous.status !== "fresh") return true;
+  return stableSnapshotPayload(candidate) !== stableSnapshotPayload(previous);
+}
+
+async function writeSnapshot(snapshot) {
+  const selected = snapshot.data || [];
+  const countries = snapshot.countries || [];
+  const lines = selected.map((entry) => `${entry.ip}:${entry.port}# ${entry.label || countryLabel(entry.country, {
+    country_en: entry.country_name,
+    country_emoji: entry.country_emoji
+  })}`);
   const plainLines = selected.map((entry) => `${entry.ip}:${entry.port}#${entry.country}`);
-  const generatedAt = new Date().toISOString();
 
   await mkdir(path.join(OUT_DIR, "country"), { recursive: true });
 
   await writeFile(path.join(OUT_DIR, "all.txt"), `${lines.join("\n")}\n`);
   await writeFile(path.join(OUT_DIR, "plain.txt"), `${plainLines.join("\n")}\n`);
-  await writeFile(
-    path.join(OUT_DIR, "all.json"),
-    `${JSON.stringify({
-      generated_at: generatedAt,
-      source_url: SOURCE_URL,
-      source_generated_at: source.generated_at || null,
-      seed,
-      limit_per_country: LIMIT_PER_COUNTRY,
-      source_total: source.list?.ips || null,
-      selected_total: selected.length,
-      countries,
-      data: selected
-    }, null, 2)}\n`
-  );
-
+  await writeFile(path.join(OUT_DIR, "all.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
   await writeFile(path.join(OUT_DIR, "countries.json"), `${JSON.stringify(countries, null, 2)}\n`);
 
   for (const country of countries) {
     const countryLines = selected
       .filter((entry) => entry.country === country.code)
-      .map((entry) => `${entry.ip}:${entry.port}# ${entry.label}`);
+      .map((entry) => `${entry.ip}:${entry.port}# ${entry.label || countryLabel(entry.country, {
+        country_en: entry.country_name,
+        country_emoji: entry.country_emoji
+      })}`);
     await writeFile(path.join(OUT_DIR, "country", `${country.code}.txt`), `${countryLines.join("\n")}\n`);
   }
 
-  await writeFile(
-    path.join(OUT_DIR, "_headers"),
-    [
-      "/*",
-      "  Access-Control-Allow-Origin: *",
-      "  X-Content-Type-Options: nosniff",
-      "  Cache-Control: public, max-age=3600",
-      "",
-      "/all.txt",
-      "  Content-Type: text/plain; charset=utf-8",
-      "",
-      "/plain.txt",
-      "  Content-Type: text/plain; charset=utf-8",
-      "",
-      "/country/*.txt",
-      "  Content-Type: text/plain; charset=utf-8",
-      ""
-    ].join("\n")
-  );
-
-  await writeFile(
-    path.join(OUT_DIR, "index.html"),
-    `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cloudflare IP Filter</title>
-  <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; line-height: 1.5; color: #161616; }
-    main { max-width: 760px; }
-    code { background: #f1f1f1; padding: .125rem .3rem; border-radius: 4px; }
-    a { color: #0645ad; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Cloudflare IP Filter</h1>
-    <p>Generated at <code>${generatedAt}</code>. Source generated at <code>${source.generated_at || "unknown"}</code>.</p>
-    <ul>
-      <li><a href="./all.txt">all.txt</a> - selected entries with readable country labels</li>
-      <li><a href="./plain.txt">plain.txt</a> - selected entries with original country codes</li>
-      <li><a href="./all.json">all.json</a> - selected entries with metadata</li>
-      <li><a href="./countries.json">countries.json</a> - country summary</li>
-    </ul>
-    <p>Selected ${selected.length} entries from ${countries.length} countries, max ${LIMIT_PER_COUNTRY} per country.</p>
-  </main>
-</body>
-</html>
-`
-  );
-
   console.log(`Generated ${selected.length} entries from ${countries.length} countries into ${OUT_DIR}`);
+}
+
+async function main() {
+  if (!Number.isInteger(LIMIT_PER_COUNTRY) || LIMIT_PER_COUNTRY < 1) {
+    throw new Error("LIMIT_PER_COUNTRY must be a positive integer");
+  }
+
+  const previous = await readBaselineSnapshot();
+  let source;
+  let snapshot;
+
+  try {
+    source = await fetchSource();
+  } catch (error) {
+    if (!previous) throw error;
+    console.log(`Source unavailable, reusing baseline: ${error.message}`);
+    snapshot = reusePreviousSnapshot(previous, [error.message]);
+    await writeSnapshot(snapshot);
+    return;
+  }
+
+  snapshot = buildSnapshot(source);
+  const validation = validateCandidate(snapshot, previous);
+
+  if (!validation.ok && previous) {
+    console.log(`Rejected candidate update: ${validation.reasons.join("; ")}`);
+    snapshot = reusePreviousSnapshot(previous, validation.reasons);
+  }
+
+  if (validation.ok && previous && !hasMeaningfulChange(snapshot, previous)) {
+    console.log("No meaningful data change, keeping baseline snapshot");
+    snapshot = previous;
+  }
+
+  await writeSnapshot(snapshot);
 }
 
 main().catch((error) => {

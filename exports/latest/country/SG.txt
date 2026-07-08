@@ -1,0 +1,5 @@
+146.190.100.44:443# SG - Singapore 🇸🇬
+159.223.50.79:443# SG - Singapore 🇸🇬
+178.128.211.191:443# SG - Singapore 🇸🇬
+194.233.67.84:2053# SG - Singapore 🇸🇬
+45.197.12.118:443# SG - Singapore 🇸🇬
