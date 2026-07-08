@@ -2,8 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const SOURCE_URL = process.env.SOURCE_URL || "https://zip.cm.edu.kg/all.json";
+const TXT_SOURCE_URL = process.env.TXT_SOURCE_URL || SOURCE_URL.replace(/\/all\.json$/, "/all.txt");
+const PUBLISHED_FALLBACK_URL = process.env.PUBLISHED_FALLBACK_URL || "https://josephcy95.github.io/cloudflare-ip-filter/all.json";
 const OUT_DIR = process.env.OUT_DIR || "public";
 const LIMIT_PER_COUNTRY = Number.parseInt(process.env.LIMIT_PER_COUNTRY || "5", 10);
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+  "cloudflare-ip-filter/1.0"
+];
 
 const COUNTRY_FALLBACK = {
   AD: ["Andorra", "🇦🇩"],
@@ -301,23 +307,131 @@ function normalizeEntry(item) {
     }));
 }
 
+async function fetchBody(url, accept) {
+  let lastError;
+
+  for (const userAgent of USER_AGENTS) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "Accept": accept,
+          "User-Agent": userAgent
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`${url} returned ${response.status} ${response.statusText}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+async function fetchJsonSource() {
+  const body = await fetchBody(SOURCE_URL, "application/json,text/plain,*/*");
+  return JSON.parse(body);
+}
+
+function sourceFromTxt(body) {
+  const data = [];
+
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.trim().match(/^(.+):(\d+)#([A-Za-z]{2})$/);
+    if (!match) continue;
+
+    const [, ip, port, rawCountry] = match;
+    const country = rawCountry.toUpperCase();
+    const [country_en, country_emoji] = COUNTRY_FALLBACK[country] || [country, ""];
+
+    data.push({
+      ip,
+      port: [Number(port)],
+      meta: {
+        country,
+        country_en,
+        country_emoji
+      }
+    });
+  }
+
+  if (data.length === 0) {
+    throw new Error("TXT source contained no valid entries");
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    list: { ips: data.length },
+    data
+  };
+}
+
+async function fetchTxtSource() {
+  const body = await fetchBody(TXT_SOURCE_URL, "text/plain,*/*");
+  return sourceFromTxt(body);
+}
+
+function sourceFromPublished(json) {
+  const data = (json.data || []).map((entry) => ({
+    ip: entry.ip,
+    port: [Number(entry.port)],
+    meta: {
+      country: entry.country,
+      country_en: entry.country_name,
+      country_emoji: entry.country_emoji,
+      city: entry.city,
+      region: entry.region,
+      asn: entry.asn,
+      asOrganization: entry.organization
+    }
+  }));
+
+  if (data.length === 0) {
+    throw new Error("Published fallback contained no valid entries");
+  }
+
+  return {
+    generated_at: json.source_generated_at || json.generated_at || new Date().toISOString(),
+    list: { ips: json.source_total || data.length },
+    data
+  };
+}
+
+async function fetchSource() {
+  const errors = [];
+
+  try {
+    return await fetchJsonSource();
+  } catch (error) {
+    errors.push(`json: ${error.message}`);
+  }
+
+  try {
+    return await fetchTxtSource();
+  } catch (error) {
+    errors.push(`txt: ${error.message}`);
+  }
+
+  try {
+    const body = await fetchBody(PUBLISHED_FALLBACK_URL, "application/json,text/plain,*/*");
+    return sourceFromPublished(JSON.parse(body));
+  } catch (error) {
+    errors.push(`published fallback: ${error.message}`);
+  }
+
+  throw new Error(`Unable to fetch any source. ${errors.join(" | ")}`);
+}
+
 async function main() {
   if (!Number.isInteger(LIMIT_PER_COUNTRY) || LIMIT_PER_COUNTRY < 1) {
     throw new Error("LIMIT_PER_COUNTRY must be a positive integer");
   }
 
-  const response = await fetch(SOURCE_URL, {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "cloudflare-ip-filter/1.0"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Source returned ${response.status} ${response.statusText}`);
-  }
-
-  const source = await response.json();
+  const source = await fetchSource();
   const seed = daySeed(source.generated_at);
   const seen = new Set();
   const groups = new Map();
