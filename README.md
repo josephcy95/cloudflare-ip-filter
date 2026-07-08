@@ -55,7 +55,7 @@ MAX_FAILURES_PER_COUNTRY=10
 
 Per country, the generator stops when it has selected 5 working entries, has seen 10 failed checks, or runs out of candidates.
 
-`CHECK_HOST` is not written into generated JSON or logs, so it can be changed to a GitHub Actions secret later without leaking through the exported files.
+`CHECK_HOST` is not written into generated JSON. If you later switch from the public default host to a private Worker hostname, store it as a GitHub Actions secret so GitHub masks it in workflow logs.
 
 ## Local Usage
 
