@@ -16,18 +16,20 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Clone repository
+        run: |
+          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Generate static files
-        run: npm run generate
+      - name: Generate exports
+        working-directory: repo
+        run: node scripts/generate.mjs
         env:
           LIMIT_PER_COUNTRY: "5"
 
       - name: Commit updated exports
+        working-directory: repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
