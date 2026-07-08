@@ -2,4 +2,4 @@
 131.186.25.156:2087# KR - South Korea 🇰🇷
 132.145.91.181:8443# KR - South Korea 🇰🇷
 141.164.42.2:443# KR - South Korea 🇰🇷
-193.123.233.175:443# KR - South Korea 🇰🇷
+85.155.176.13:8443# KR - South Korea 🇰🇷
