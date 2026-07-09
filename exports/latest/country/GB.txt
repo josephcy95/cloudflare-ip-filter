@@ -1,5 +1,5 @@
-165.232.108.151:443# GB - United Kingdom 🇬🇧
-193.219.99.177:8443# GB - United Kingdom 🇬🇧
-213.165.33.145:443# GB - United Kingdom 🇬🇧
-57.129.137.228:443# GB - United Kingdom 🇬🇧
-68.183.43.192:443# GB - United Kingdom 🇬🇧
+138.124.51.101:443# GB - United Kingdom 🇬🇧
+138.124.52.178:443# GB - United Kingdom 🇬🇧
+159.65.16.241:443# GB - United Kingdom 🇬🇧
+167.172.63.237:443# GB - United Kingdom 🇬🇧
+176.124.203.101:443# GB - United Kingdom 🇬🇧

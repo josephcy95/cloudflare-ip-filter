@@ -1,5 +1,5 @@
-138.124.65.187:443# LT - Lithuania 🇱🇹
-176.223.137.120:443# LT - Lithuania 🇱🇹
-185.237.185.182:2053# LT - Lithuania 🇱🇹
-212.24.99.150:443# LT - Lithuania 🇱🇹
-89.40.9.60:443# LT - Lithuania 🇱🇹
+130.12.171.173:443# LT - Lithuania 🇱🇹
+130.12.171.96:8443# LT - Lithuania 🇱🇹
+185.237.185.110:2053# LT - Lithuania 🇱🇹
+195.238.126.150:443# LT - Lithuania 🇱🇹
+85.206.161.200:443# LT - Lithuania 🇱🇹

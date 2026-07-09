@@ -3,7 +3,7 @@
     "code": "AE",
     "name": "United Arab Emirates",
     "emoji": "🇦🇪",
-    "source_count": 16,
+    "source_count": 15,
     "selected_count": 5
   },
   {
@@ -17,7 +17,7 @@
     "code": "AM",
     "name": "Armenia",
     "emoji": "🇦🇲",
-    "source_count": 11,
+    "source_count": 10,
     "selected_count": 5
   },
   {
@@ -31,7 +31,7 @@
     "code": "AT",
     "name": "Austria",
     "emoji": "🇦🇹",
-    "source_count": 113,
+    "source_count": 114,
     "selected_count": 5
   },
   {
@@ -59,7 +59,7 @@
     "code": "BG",
     "name": "Bulgaria",
     "emoji": "🇧🇬",
-    "source_count": 71,
+    "source_count": 69,
     "selected_count": 5
   },
   {
@@ -87,7 +87,7 @@
     "code": "CH",
     "name": "Switzerland",
     "emoji": "🇨🇭",
-    "source_count": 160,
+    "source_count": 156,
     "selected_count": 5
   },
   {
@@ -101,8 +101,8 @@
     "code": "CN",
     "name": "China",
     "emoji": "🇨🇳",
-    "source_count": 2,
-    "selected_count": 2
+    "source_count": 3,
+    "selected_count": 3
   },
   {
     "code": "CY",
@@ -115,21 +115,21 @@
     "code": "CZ",
     "name": "Czechia",
     "emoji": "🇨🇿",
-    "source_count": 93,
+    "source_count": 91,
     "selected_count": 5
   },
   {
     "code": "DE",
     "name": "Germany",
     "emoji": "🇩🇪",
-    "source_count": 4009,
+    "source_count": 4005,
     "selected_count": 5
   },
   {
     "code": "DK",
     "name": "Denmark",
     "emoji": "🇩🇰",
-    "source_count": 48,
+    "source_count": 47,
     "selected_count": 5
   },
   {
@@ -143,7 +143,7 @@
     "code": "EE",
     "name": "Estonia",
     "emoji": "🇪🇪",
-    "source_count": 134,
+    "source_count": 135,
     "selected_count": 5
   },
   {
@@ -164,21 +164,21 @@
     "code": "FI",
     "name": "Finland",
     "emoji": "🇫🇮",
-    "source_count": 1007,
+    "source_count": 1061,
     "selected_count": 5
   },
   {
     "code": "FR",
     "name": "France",
     "emoji": "🇫🇷",
-    "source_count": 985,
+    "source_count": 984,
     "selected_count": 5
   },
   {
     "code": "GB",
     "name": "United Kingdom",
     "emoji": "🇬🇧",
-    "source_count": 1948,
+    "source_count": 1835,
     "selected_count": 5
   },
   {
@@ -192,14 +192,14 @@
     "code": "GR",
     "name": "Greece",
     "emoji": "🇬🇷",
-    "source_count": 7,
+    "source_count": 6,
     "selected_count": 5
   },
   {
     "code": "HK",
     "name": "Hong Kong",
     "emoji": "🇭🇰",
-    "source_count": 91,
+    "source_count": 86,
     "selected_count": 5
   },
   {
@@ -220,21 +220,21 @@
     "code": "ID",
     "name": "Indonesia",
     "emoji": "🇮🇩",
-    "source_count": 4,
+    "source_count": 3,
     "selected_count": 3
   },
   {
     "code": "IE",
     "name": "Ireland",
     "emoji": "🇮🇪",
-    "source_count": 17,
+    "source_count": 18,
     "selected_count": 5
   },
   {
     "code": "IL",
     "name": "Israel",
     "emoji": "🇮🇱",
-    "source_count": 11,
+    "source_count": 10,
     "selected_count": 5
   },
   {
@@ -255,14 +255,14 @@
     "code": "IT",
     "name": "Italy",
     "emoji": "🇮🇹",
-    "source_count": 29,
+    "source_count": 31,
     "selected_count": 5
   },
   {
     "code": "JP",
     "name": "Japan",
     "emoji": "🇯🇵",
-    "source_count": 292,
+    "source_count": 280,
     "selected_count": 5
   },
   {
@@ -283,14 +283,14 @@
     "code": "KR",
     "name": "South Korea",
     "emoji": "🇰🇷",
-    "source_count": 40,
+    "source_count": 37,
     "selected_count": 5
   },
   {
     "code": "KZ",
     "name": "Kazakhstan",
     "emoji": "🇰🇿",
-    "source_count": 79,
+    "source_count": 78,
     "selected_count": 5
   },
   {
@@ -304,7 +304,7 @@
     "code": "LV",
     "name": "Latvia",
     "emoji": "🇱🇻",
-    "source_count": 475,
+    "source_count": 467,
     "selected_count": 5
   },
   {
@@ -332,7 +332,7 @@
     "code": "MY",
     "name": "Malaysia",
     "emoji": "🇲🇾",
-    "source_count": 23,
+    "source_count": 22,
     "selected_count": 5
   },
   {
@@ -346,7 +346,7 @@
     "code": "NL",
     "name": "Netherlands",
     "emoji": "🇳🇱",
-    "source_count": 3816,
+    "source_count": 3720,
     "selected_count": 5
   },
   {
@@ -374,7 +374,7 @@
     "code": "PL",
     "name": "Poland",
     "emoji": "🇵🇱",
-    "source_count": 276,
+    "source_count": 267,
     "selected_count": 5
   },
   {
@@ -402,7 +402,7 @@
     "code": "RU",
     "name": "Russia",
     "emoji": "🇷🇺",
-    "source_count": 432,
+    "source_count": 419,
     "selected_count": 5
   },
   {
@@ -416,14 +416,14 @@
     "code": "SE",
     "name": "Sweden",
     "emoji": "🇸🇪",
-    "source_count": 266,
+    "source_count": 262,
     "selected_count": 5
   },
   {
     "code": "SG",
     "name": "Singapore",
     "emoji": "🇸🇬",
-    "source_count": 282,
+    "source_count": 281,
     "selected_count": 5
   },
   {
@@ -438,41 +438,41 @@
     "name": "Slovakia",
     "emoji": "🇸🇰",
     "source_count": 4,
-    "selected_count": 2
+    "selected_count": 4
   },
   {
     "code": "TH",
     "name": "Thailand",
     "emoji": "🇹🇭",
-    "source_count": 39,
+    "source_count": 38,
     "selected_count": 5
   },
   {
     "code": "TR",
     "name": "Turkey",
     "emoji": "🇹🇷",
-    "source_count": 82,
+    "source_count": 78,
     "selected_count": 5
   },
   {
     "code": "TW",
     "name": "Taiwan",
     "emoji": "🇨🇳",
-    "source_count": 6,
-    "selected_count": 4
+    "source_count": 5,
+    "selected_count": 5
   },
   {
     "code": "UA",
     "name": "Ukraine",
     "emoji": "🇺🇦",
-    "source_count": 5,
-    "selected_count": 5
+    "source_count": 4,
+    "selected_count": 4
   },
   {
     "code": "US",
     "name": "United States",
     "emoji": "🇺🇸",
-    "source_count": 1819,
+    "source_count": 1785,
     "selected_count": 5
   },
   {
@@ -493,8 +493,8 @@
     "code": "VN",
     "name": "Vietnam",
     "emoji": "🇻🇳",
-    "source_count": 3,
-    "selected_count": 3
+    "source_count": 4,
+    "selected_count": 4
   },
   {
     "code": "ZA",

@@ -1,5 +1,5 @@
-146.190.233.213:2083# NL - Netherlands 🇳🇱
-152.53.200.163:443# NL - Netherlands 🇳🇱
-188.166.103.140:2083# NL - Netherlands 🇳🇱
-188.166.83.167:2053# NL - Netherlands 🇳🇱
-43.250.54.107:443# NL - Netherlands 🇳🇱
+167.99.40.165:2083# NL - Netherlands 🇳🇱
+188.226.145.180:443# NL - Netherlands 🇳🇱
+31.59.170.59:2053# NL - Netherlands 🇳🇱
+37.139.1.36:443# NL - Netherlands 🇳🇱
+51.158.205.131:443# NL - Netherlands 🇳🇱

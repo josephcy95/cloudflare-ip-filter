@@ -1,5 +1,5 @@
-104.129.59.249:443# US - United States 🇺🇸
-138.197.194.78:2053# US - United States 🇺🇸
-216.128.154.139:8443# US - United States 🇺🇸
-23.95.215.205:2053# US - United States 🇺🇸
-3.146.240.225:443# US - United States 🇺🇸
+107.174.218.15:8443# US - United States 🇺🇸
+142.248.219.184:2053# US - United States 🇺🇸
+149.28.56.202:443# US - United States 🇺🇸
+199.119.137.41:8443# US - United States 🇺🇸
+97.64.30.130:443# US - United States 🇺🇸
