@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-07-09T06:54:06.365Z",
+  "generated_at": "2026-07-10T06:54:26.627Z",
   "source_url": "https://zip.cm.edu.kg/all.json",
   "source_generated_at": "2026-07-09T02:51:33.834683",
   "seed": "2026-07-09",
-  "status": "fresh",
+  "status": "reused_previous",
   "limit_per_country": 5,
   "source_total": 13420,
   "selected_total": 294,
@@ -4049,5 +4049,11 @@
       "asn": 154177,
       "organization": "LIGHT NODE LIMITED"
     }
-  ]
+  ],
+  "rejected_update": {
+    "checked_at": "2026-07-10T06:54:26.627Z",
+    "reasons": [
+      "countries disappeared: AR, EG, HR, PT, SI"
+    ]
+  }
 }
