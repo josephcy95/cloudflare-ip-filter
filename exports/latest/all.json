@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T07:54:04.486Z",
+  "generated_at": "2026-09-13T08:16:50.416Z",
   "source_url": "https://zip.cm.edu.kg/all.json",
   "source_generated_at": "2026-07-09T02:51:33.834683",
   "seed": "2026-07-09",
@@ -4051,7 +4051,7 @@
     }
   ],
   "rejected_update": {
-    "checked_at": "2026-09-12T07:54:04.486Z",
+    "checked_at": "2026-09-13T08:16:50.416Z",
     "reasons": [
       "countries disappeared: BD, HR, SI, VG"
     ]
